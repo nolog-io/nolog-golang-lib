@@ -959,7 +959,12 @@ func write_report(w *writespec.WriteRequest, lb string) retry_status_code {
 		log.Fatal("Marshalling write request should always succeed, but found error: ", err)
 	}
 	pbytesBuf := bytes.NewBuffer([]byte{})
-	_, err = gzip.NewWriter(pbytesBuf).Write(upbytes)
+	gz := gzip.NewWriter(pbytesBuf)
+	_, err = gz.Write(upbytes)
+	if err != nil {
+		log.Fatal("gzip.NewWriter.Write should never fail, but found error: ", err)
+	}
+	err = gz.Close()
 	if err != nil {
 		log.Fatal("gzip.NewWriter.Write should never fail, but found error: ", err)
 	}
