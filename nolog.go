@@ -473,7 +473,7 @@ func (self *tracker) safe_start(parent *base_counter) *tracker {
 	return tracker
 }
 
-// Predefined Alert message to surface in the event of a failure when fulfilling an Objective or calling a Dependency.
+// Predefined message to surface in the event of a failure when fulfilling an Objective or calling a Dependency.
 type Alert struct {
 	alert *alert
 }
@@ -487,7 +487,7 @@ func new_Alert(a *alert) Alert {
 	}
 }
 
-// Dependency measures the success rate of calling a dependency and helps trigger alrets in the event of a failure.
+// Dependency tracks out-of-process entities (e.g. other services, databases, or agents) that an Objective relies on.
 type Dependency struct {
 	bc *base_counter
 }
@@ -537,12 +537,9 @@ func new_DependencyTracker(t *tracker) DependencyTracker {
 	}
 }
 
-// Success is used to mark the DependencyTracker as successfully completed.
-//
-// Calling Success() or Fail(...) marks this DependencyTracker as closed.
-// The following result in error states that will (1) stop tracking the Objective and (2) Surface an alert on the dashboard when possible:
-// - Success() or Fail(...) is invoked again on a closed Tracker.
-// - Any tracker is garbage collected without a Success() or Fail(...) call.
+// Success is used to mark this tracker as successfully completed (including ending early due to bad input or reaching successful completion).
+// Calling Success() or Fail(...) marks this tracker as closed.
+// Forgetting to close or trying to re-close a tracker results in tracking entering an error state.
 func (self DependencyTracker) Success() {
 	if self.tracker == nil {
 		errors.safe_notify(
@@ -556,13 +553,11 @@ func (self DependencyTracker) Success() {
 	self.tracker.safe_success()
 }
 
-// Fail lets nolog know of the failure and the alert to display on the dashboard.
-// Error messages (max: 1000 chars) passed to Fail() will be sampled before being sent onwards.
-//
-// Calling Success() or Fail(...) marks this DependencyTracker as closed.
-// The following result in error states that will (1) stop tracking the Objective and (2) Surface an alert on the dashboard when possible:
-// - Success() or Fail(...) is invoked again on a closed Tracker.
-// - This tracker is garbage collected without a Success() or Fail(...) call.
+// Fail is used to mark the tracker as failed using the Alert as the reason.
+// Included error messages (max: 1000 chars) passed to Fail() will be sampled
+// before being sent onwards.
+// Calling Success() or Fail(...) marks this tracker as closed.
+// Forgetting to close or trying to re-close a tracker results in tracking entering an error state.
 func (self DependencyTracker) Fail(a Alert, m string) {
 	if self.tracker == nil || a.alert == nil {
 		errors.safe_notify(
@@ -590,13 +585,9 @@ func new_ObjectiveTracker(t *tracker) ObjectiveTracker {
 	}
 }
 
-// Success is used to mark the ObjectiveTracker as successfully completed.
-//
-// Calling Success() or Fail(...) marks this ObjectiveTracker as closed.
-// The following result in error states that will (1) stop tracking the Objective and (2) Surface an alert on the dashboard when possible:
-// - Success() or Fail(...) is invoked again on a closed Tracker.
-// - Any dependencies tracking started as part of this objective aren't already closed via Success() or Fail(...) calls.
-// - Any tracker is garbage collected without a Success() or Fail(...) call.
+// Success is used to mark this tracker as successfully completed (including ending early due to bad input or reaching successful completion).
+// Calling Success() or Fail(...) marks this tracker as closed.
+// Forgetting to close or trying to re-close a tracker results in tracking entering an error state.
 func (self ObjectiveTracker) Success() {
 	if self.tracker == nil {
 		errors.safe_notify(
@@ -610,14 +601,11 @@ func (self ObjectiveTracker) Success() {
 	self.tracker.safe_success()
 }
 
-// Fail lets nolog know of the failure and the alert to display on the dashboard.
-// Error messages (max: 1000 chars) passed to Fail() will be sampled before being sent onwards.
-//
-// Calling Success() or Fail(...) marks this ObjectiveTracker as closed.
-// The following result in error states that will (1) stop tracking the Objective and (2) Surface an alert on the dashboard when possible:
-// - Success() or Fail(...) is invoked again on a closed Tracker.
-// - Any dependencies tracking started as part of this objective aren't already closed via Success() or Fail(...) calls.
-// - This tracker is garbage collected without a Success() or Fail(...) call.
+// Fail is used to mark the tracker as failed using the Alert as the reason.
+// Included error messages (max: 1000 chars) passed to Fail() will be sampled
+// before being sent onwards.
+// Calling Success() or Fail(...) marks this tracker as closed.
+// Forgetting to close or trying to re-close a tracker results in tracking entering an error state.
 func (self ObjectiveTracker) Fail(a Alert, m string) {
 	if self.tracker == nil || a.alert == nil {
 		errors.safe_notify(
@@ -650,45 +638,6 @@ func (self ObjectiveTracker) StartDependency(d Dependency) DependencyTracker {
 // Objective represents a monitored service goal.
 // Each service goal is registered once via a nolog.CreateObjective and an
 // Objective is returned to be used in code for monitoring.
-//  package example
-//
-//  import nolog
-//
-//  var (
-//   respondHelloObjective = CreateObjective("RespondHello")
-//  )
-//
-//  func RespondHello(name string) string {
-//    respondHello := respondHelloObjective.start()
-//    result := "Hello " + name "!"
-//    respondHello.success()
-//	  return result
-//  }
-//
-// Any dependencies that the Objective relies on and any alerts that may be surfaced should be defined here as well.
-//  package example
-//
-//  import nolog
-//
-//  var (
-//   respondHelloObjective = CreateObjective("RespondHello")
-//   unsupportedNameAlert = respondHelloObjective.WithAlert("Unsupported name, starts with A.")
-//   lastNameServiceDep = respondHelloObjective.AddDependency("lastNameService")
-//  )
-//
-//  func RespondHello(name string) (string, error) {
-//    respondHello := respondHelloObjective.start()
-//    if name.startsWith("a") || name.startsWith("A") {
-//	    respondHello.Fail(unsupportedNameAlert, name)
-//      return "", fmt.Errorf("Unsupported name %s", name)
-//    }
-//    callLastName := lastNameServiceDep.start()
-//    lastName := getLastName(name)
-//    callLastName.success()
-//    result := "Hello " + name +" " + lastName + "!"
-//    respondHello.success()
-//	  return result, nil
-//  }
 type Objective struct {
 	bc *base_counter
 }
@@ -702,20 +651,7 @@ func new_Objective(bc *base_counter) Objective {
 	}
 }
 
-// Add a Dependency to this Objective used for tracking.
-//  dependency: 	the name of the dependency (max: 40 chars)
-//  action: 		a description of the the feature of the dependency being relied on. (max: 40 chars)
-//
-// The three recommended approaches for action are to either:
-//
-// 1. Pass in either a simple-descriptor for the work being performed by the dependency
-//  AddDependency("AccountAPI", "GetOwnerFromAccount")
-//
-// 2. the descriptive HTTP path exposed by the dependency.
-//  AddDependency("AccountAPI", "/get-account")
-//
-// 3. in the event of a database, the the table name being relied on.
-//  AddDependency("MySqlDatabase", "Accounts")
+// Add a Dependency (max: 40 chars) to track that is used by this Objective and a short action (max: 40 chars) that describes the usage.
 func (self Objective) AddDependency(name, action string) Dependency {
 	if self.bc == nil {
 		errors.safe_notify(
@@ -1039,21 +975,6 @@ func write_report(w *writespec.WriteRequest, lb string) retry_status_code {
 }
 
 // CreateObjective returns an Objective (max: 40 chars) used for monitoring a Service objective.
-// This should be called once to register the Objective:
-//  package example
-//
-//  import nolog
-//
-//  var (
-//   respondHelloObjective = CreateObjective("RespondHello")
-//  )
-//
-//  func RespondHello(name string) string {
-//    respondHello := respondHelloObjective.start()
-//    result := "Hello " + name + "!"
-//    respondHello.success()
-//	  return result
-//  }
 func CreateObjective(name string) Objective {
 	name = trim(name, 40, true)
 	if strings.HasPrefix(name, "nolog") {
@@ -1074,14 +995,9 @@ func CreateObjective(name string) Objective {
 }
 
 // Initialize needs to be called in main() before the program begins monitoring with NoLog.
-//
-//  serviceID:       The name of the service being monitored shared across instances. (max: 40 chars)
-//  instanceID:      A unique instance identifier to diffrentiate instances. (max: 40 chars)
-//  versionID:       Version ID of the software running, used to differentiate instances during partial deployment. (max: 10 chars)
-//  noLogConfig:     NoLog API Key downloaded from nolog.io
-func Initialize(serviceId, instanceId, versionId, noLogConfig string) {
-	if len(noLogConfig) > 5000 {
-		noLogConfig = noLogConfig[0:5000]
+func Initialize(serviceId, instanceId, versionId, noLogApiKey string) {
+	if len(noLogApiKey) > 5000 {
+		noLogApiKey = noLogApiKey[0:5000]
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -1091,7 +1007,7 @@ func Initialize(serviceId, instanceId, versionId, noLogConfig string) {
 			ERROR_BIT_MULTIPLE_INITIALIZATION)
 		return
 	}
-	if len(noLogConfig) == 0 {
+	if len(noLogApiKey) == 0 {
 		errors.safe_notify(
 			"Cannot initialize NoLog with empty key",
 			NOTIFY_BIT_EMPTY_API_KEY)
@@ -1118,10 +1034,10 @@ func Initialize(serviceId, instanceId, versionId, noLogConfig string) {
 	for _, obj := range objectives {
 		obj.bc.safe_update_init(initialized)
 	}
-	raw_key = noLogConfig
+	raw_key = noLogApiKey
 	key := auth.ClientKey{}
-	if noLogConfig != "local" {
-		decodedConfig, err := base64.StdEncoding.DecodeString(noLogConfig)
+	if noLogApiKey != "local" {
+		decodedConfig, err := base64.StdEncoding.DecodeString(noLogApiKey)
 		if err != nil {
 			errors.safe_notify(
 				"Cannot initialize NoLog with invalid API key",
