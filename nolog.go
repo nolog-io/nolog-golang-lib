@@ -559,7 +559,7 @@ func (self DependencyTracker) Success() {
 // Calling Success() or Fail(...) marks this tracker as closed.
 // Forgetting to close or trying to re-close a tracker results in tracking entering an error state.
 func (self DependencyTracker) Fail(a Alert, m string) {
-	if self.tracker == nil || a.alert == nil {
+	if self.tracker == nil {
 		errors.safe_notify(
 			"Invalid API usage detected on DependencyTracker.Fail(), monitoring disabled.",
 			NOTIFY_BIT_INCORRECT_API_USAGE)
@@ -607,7 +607,7 @@ func (self ObjectiveTracker) Success() {
 // Calling Success() or Fail(...) marks this tracker as closed.
 // Forgetting to close or trying to re-close a tracker results in tracking entering an error state.
 func (self ObjectiveTracker) Fail(a Alert, m string) {
-	if self.tracker == nil || a.alert == nil {
+	if self.tracker == nil {
 		errors.safe_notify(
 			"Invalid API usage detected on ObjectiveTracker.Fail(), monitoring disabled.",
 			NOTIFY_BIT_INCORRECT_API_USAGE)
